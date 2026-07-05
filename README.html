@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>readme</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="README_files/libs/clipboard/clipboard.min.js"></script>
+<script src="README_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="README_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="README_files/libs/quarto-html/popper.min.js"></script>
+<script src="README_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="README_files/libs/quarto-html/anchor.min.js"></script>
+<link href="README_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="README_files/libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="README_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="README_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="README_files/libs/bootstrap/bootstrap-efbb37e9afcc02144ebbc7afd12a776f.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+
+
+
+<section id="worldcupclassification" class="level1">
+<h1>WorldCupClassification</h1>
+</section>
+<section id="problem-statement-and-project-context" class="level1">
+<h1>Problem Statement and Project Context</h1>
+<p>This project aimed to understand what factors make up an “advancing team” profile, with the goal of gaining insight into Belgium vs.&nbsp;USA on 7/6/2026 (Round of 16). I implemented a soft classification approach using Logistic Regression (elastic net) and Linear Discriminant Analysis to infer common statistical patterns among teams that have advanced past the group stage, then applied those models to Belgium’s and USA’s own profiles for comparison.</p>
+<p><strong>Target Variable:</strong> <code>Advanced</code>, a binary variable with levels <code>"Advanced"</code> / <code>"Eliminated"</code>. A team is labeled “Advanced” if it played more than 3 matches (i.e., survived the group stage into the Round of 32).</p>
+<p><strong>Predictors:</strong> <code>possession</code>, <code>goals_per90</code>, <code>assists_per90</code>, <code>shots_on_target_pct</code>, <code>goals_per90_against</code>, <code>tackles_won_per90</code>, <code>interceptions_per90</code>, <code>gk_save_pct</code>, <code>cards_yellow_per90</code>, <code>cards_red_per90</code>, <code>fouls_per90</code></p>
+<p>All rate-based predictors were converted to per-90-minute values (rather than raw match totals) to avoid leakage — since advancing teams have by definition played more matches, raw cumulative counts like total fouls or total tackles would mechanically be larger for advancing teams regardless of actual playing style.</p>
+<p><strong>Train split:</strong> Predictors and target for all countries except Belgium &amp; USA (n = 46) <strong>Application set:</strong> Predictors for Belgium &amp; USA only (not used in training; scored by the fitted models)</p>
+<p><strong>Methods used and stack:</strong> Logistic Regression (elastic net / lasso), Linear Discriminant Analysis, Cross-Validation, Model Tuning, R (tidymodels)</p>
+</section>
+<section id="takeaways-model-comparison-via-5-fold-cross-validation" class="level1">
+<h1>Takeaways: Model Comparison via 5-fold Cross-Validation</h1>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 17%">
+<col style="width: 16%">
+<col style="width: 20%">
+<col style="width: 19%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">model</th>
+<th style="text-align: right;">mean_accuracy</th>
+<th style="text-align: right;">mean_roc_auc</th>
+<th style="text-align: right;">std_err_accuracy</th>
+<th style="text-align: right;">std_err_roc_auc</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Elastic Net Logistic</td>
+<td style="text-align: right;">0.7294444</td>
+<td style="text-align: right;">0.791</td>
+<td style="text-align: right;">0.0718559</td>
+<td style="text-align: right;">0.0826499</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">LDA</td>
+<td style="text-align: right;">0.6400000</td>
+<td style="text-align: right;">0.650</td>
+<td style="text-align: right;">0.0889305</td>
+<td style="text-align: right;">0.1042113</td>
+</tr>
+</tbody>
+</table>
+<p>Both models perform meaningfully better than chance (0.50 AUC), but with high standard errors — a direct consequence of the small sample size feeding the 5-fold cross-validation. With n = 46 teams split into 5 folds, each fold’s held-out (test) set contains only about 9 teams. With so few observations per fold, a single team’s prediction can have an outsized influence on that fold’s computed AUC, causing meaningful fold-to-fold variability, which is what produces the high standard error for both models.</p>
+<p>Elastic Net Logistic Regression outperforms LDA on both accuracy and ROC AUC. This is likely because the elastic net (lasso) penalty performs automatic feature selection, dropping predictors that add more noise than signal given the limited sample size — as seen below, only 2 of 11 predictors survived. LDA has no equivalent built-in feature selection and uses all 11 predictors regardless of their individual reliability, making it more exposed to overfitting on weak or noisy features at this sample size.</p>
+</section>
+<section id="roc-curve" class="level1">
+<h1>ROC Curve</h1>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="image.png" class="img-fluid figure-img"></p>
+<figcaption>alt text</figcaption>
+</figure>
+</div>
+<p>The ROC curve describes the relationship between a model’s True Positive Rate and False Positive Rate — a model that hugs the top-left corner has high sensitivity and low false-positive rate. Elastic Net Logistic Regression traces a curve closer to the top-left than LDA, consistent with its higher CV AUC, and is the model I rely on for the final interpretation below.</p>
+</section>
+<section id="what-drives-the-model-coefficients" class="level1">
+<h1>What Drives the Model: Coefficients</h1>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th style="text-align: left;">term</th>
+<th style="text-align: right;">estimate</th>
+<th style="text-align: right;">penalty</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">assists_per90</td>
+<td style="text-align: right;">0.5931575</td>
+<td style="text-align: right;">0.0885867</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">goals_per90</td>
+<td style="text-align: right;">0.4738101</td>
+<td style="text-align: right;">0.0885867</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">(Intercept)</td>
+<td style="text-align: right;">0.1400281</td>
+<td style="text-align: right;">0.0885867</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">possession</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0885867</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">shots_on_target_pct</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0885867</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">goals_per90_against</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0885867</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">tackles_won_per90</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0885867</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">interceptions_per90</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0885867</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">gk_save_pct</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0885867</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">cards_yellow_per90</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0885867</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">cards_red_per90</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0885867</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">fouls_per90</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">0.0885867</td>
+</tr>
+</tbody>
+</table>
+<p>(Signs flipped from the raw model output so that positive values indicate an association with “Advanced” rather than “Eliminated,” matching R’s default factor-level encoding.)</p>
+<p>The lasso penalty selected via cross-validation (penalty ≈ 0.089) shrank 9 of the 11 candidate predictors to exactly zero, retaining only <strong>assists_per90</strong> and <strong>goals_per90</strong>. This means that, once leakage from raw match-count statistics was removed, attacking output per 90 minutes was the only signal strong and consistent enough across 46 teams to reliably distinguish advancing teams from eliminated ones — defensive stats, discipline, possession, and goalkeeping did not add reliable predictive value at this sample size.</p>
+</section>
+<section id="model-performance-on-belgium-usa" class="level1">
+<h1>Model Performance on Belgium &amp; USA</h1>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th style="text-align: left;">model</th>
+<th style="text-align: left;">team</th>
+<th style="text-align: right;">.pred_Advanced</th>
+<th style="text-align: right;">.pred_Eliminated</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Logistic Regression</td>
+<td style="text-align: left;">Belgium</td>
+<td style="text-align: right;">0.6512436</td>
+<td style="text-align: right;">0.3487564</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Logistic Regression</td>
+<td style="text-align: left;">United States</td>
+<td style="text-align: right;">0.6441139</td>
+<td style="text-align: right;">0.3558861</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">LDA</td>
+<td style="text-align: left;">Belgium</td>
+<td style="text-align: right;">0.8780026</td>
+<td style="text-align: right;">0.1219974</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">LDA</td>
+<td style="text-align: left;">United States</td>
+<td style="text-align: right;">0.6702437</td>
+<td style="text-align: right;">0.3297563</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Interpretation:</strong> Using the Elastic Net Logistic Regression model — the more reliable of the two given its stronger cross-validated performance and built-in feature selection — Belgium and the United States score almost identically (65.1% vs.&nbsp;64.4% match to an “advancing team” profile). This closeness is a direct consequence of the model retaining only <code>goals_per90</code> and <code>assists_per90</code> as predictors: Belgium’s values (1.85 goals/90, 1.15 assists/90) and USA’s values (2.00 goals/90, 1.00 assists/90) are very close to each other, leaving little for the model to differentiate on. LDA shows a larger gap favoring Belgium (87.8% vs.&nbsp;67.0%), but this result should be treated with more caution, since LDA uses all 11 predictors — including several that showed little individual reliability — and had a substantially weaker cross-validated AUC (0.650 vs.&nbsp;0.791).</p>
+<p><strong>This model does not predict who will win Monday’s match.</strong> It was trained on whether a team’s statistical profile resembles that of teams which historically advanced past the group stage — a label both Belgium and the United States already share — not on a head-to-head match outcome. What it offers instead is a relative comparison of how strongly each team’s underlying attacking output resembles that of teams that continue advancing deeper into the tournament. Based on the more trustworthy of the two models, that comparison shows Belgium and USA as close to evenly matched on the metrics that carried real predictive signal, rather than one team holding a clear statistical edge.</p>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
